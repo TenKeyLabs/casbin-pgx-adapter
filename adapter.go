@@ -2,6 +2,8 @@ package pgxadapter
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/mmcloughlin/meow"
 )
 
 const (
@@ -163,29 +164,25 @@ func (a *Adapter) LoadPolicy(model model.Model) error {
 
 func policyID(ptype string, rule []string) string {
 	data := strings.Join(append([]string{ptype}, rule...), ",")
-	sum := meow.Checksum(0, []byte(data))
-	return fmt.Sprintf("%x", sum)
+	sum := md5.Sum([]byte(data))
+	return hex.EncodeToString(sum[:])
 }
 
 func policyArgs(ptype string, rule []string) []interface{} {
-	row := make([]interface{}, 8)
+	row := make([]interface{}, 7)
 	row[0] = pgtype.Text{
-		String: policyID(ptype, rule),
-		Valid:  true,
-	}
-	row[1] = pgtype.Text{
 		String: ptype,
 		Valid:  true,
 	}
 	l := len(rule)
 	for i := 0; i < 6; i++ {
 		if i < l {
-			row[2+i] = pgtype.Text{
+			row[1+i] = pgtype.Text{
 				String: rule[i],
 				Valid:  true,
 			}
 		} else {
-			row[2+i] = pgtype.Text{
+			row[1+i] = pgtype.Text{
 				Valid: false,
 			}
 		}
@@ -226,8 +223,8 @@ func (a *Adapter) SavePolicy(model model.Model) error {
 
 func (a *Adapter) insertPolicyStmt() string {
 	return fmt.Sprintf(`
-		INSERT INTO %s (id, p_type, v0, v1, v2, v3, v4, v5)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING
+		INSERT INTO %s (p_type, v0, v1, v2, v3, v4, v5)
+		VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING
 	`, a.schemaTable())
 }
 
