@@ -131,7 +131,9 @@ func testCustomDatabaseAndTableName(t *testing.T, a *Adapter, e *casbin.Enforcer
 		{"alice", "data1", "read"},
 		{"bob", "data2", "write"},
 		{"data2_admin", "data2", "read"},
-		{"data2_admin", "data2", "write"}},
+		{"data2_admin", "data2", "write"},
+		{"data1_admin", "data1", "rw"},
+	},
 		policies,
 	)
 }
@@ -230,6 +232,29 @@ func testLoadFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 		[][]string{{"alice", "data1", "read"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
 		e.GetPolicy(),
 	)
+
+	// load filtered for all ptype
+	e, err = casbin.NewEnforcer("testdata/rbac_model.conf", a)
+	require.NoError(t, err)
+	err = e.LoadFilteredPolicy(&Filter{
+		P:  [][]string{{"", "", "write"}},
+		G:  [][]string{{"alice"}},
+		G2: [][]string{{"", "rw"}},
+	})
+	require.NoError(t, err)
+	assert.True(t, e.IsFiltered())
+	assertPolicy(t,
+		[][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "write"}},
+		e.GetPolicy(),
+	)
+	assertPolicy(t,
+		[][]string{{"alice", "data2_admin"}},
+		e.GetGroupingPolicy(),
+	)
+	assertPolicy(t,
+		[][]string{{"read", "rw"}, {"write", "rw"}},
+		e.GetNamedGroupingPolicy("g2"),
+	)
 }
 
 func testLoadFilteredGroupingPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
@@ -241,7 +266,7 @@ func testLoadFilteredGroupingPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer
 	})
 	require.NoError(t, err)
 	assert.True(t, e.IsFiltered())
-	assertPolicy(t, [][]string{}, e.GetGroupingPolicy())
+	assertPolicy(t, [][]string{{"bob", "data1_admin"}}, e.GetGroupingPolicy())
 
 	e, err = casbin.NewEnforcer("testdata/rbac_model.conf", a)
 	require.NoError(t, err)
@@ -263,7 +288,13 @@ func testLoadFilteredPolicyNilFilter(t *testing.T, a *Adapter, e *casbin.Enforce
 
 	assert.False(t, e.IsFiltered())
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
+		[][]string{
+			{"alice", "data1", "read"},
+			{"bob", "data2", "write"},
+			{"data2_admin", "data2", "read"},
+			{"data2_admin", "data2", "write"},
+			{"data1_admin", "data1", "rw"},
+		},
 		e.GetPolicy(),
 	)
 }
@@ -315,12 +346,24 @@ func testUpdatePolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	err = e.LoadPolicy()
 	require.NoError(t, err)
 
-	assertPolicy(t, e.GetPolicy(), [][]string{{"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"bob", "data1", "read"}, {"alice", "data2", "write"}})
+	assertPolicy(t, e.GetPolicy(), [][]string{
+		{"data2_admin", "data2", "read"},
+		{"data2_admin", "data2", "write"},
+		{"data1_admin", "data1", "rw"},
+		{"bob", "data1", "read"},
+		{"alice", "data2", "write"},
+	})
 
 	_, err = e.UpdatePolicy([]string{"bob", "data1", "read"}, []string{"alice", "data1", "read"})
 	require.NoError(t, err)
 
-	assertPolicy(t, e.GetPolicy(), [][]string{{"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"alice", "data1", "read"}, {"alice", "data2", "write"}})
+	assertPolicy(t, e.GetPolicy(), [][]string{
+		{"data2_admin", "data2", "read"},
+		{"data2_admin", "data2", "write"},
+		{"data1_admin", "data1", "rw"},
+		{"alice", "data1", "read"},
+		{"alice", "data2", "write"},
+	})
 }
 
 func testUpdatePolicyWithLoadFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
@@ -342,7 +385,13 @@ func testUpdatePolicyWithLoadFilteredPolicy(t *testing.T, a *Adapter, e *casbin.
 	err = e.LoadPolicy()
 	require.NoError(t, err)
 
-	assertPolicy(t, e.GetPolicy(), [][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"bob", "data2", "read"}, {"alice", "data2", "write"}})
+	assertPolicy(t, e.GetPolicy(), [][]string{
+		{"alice", "data1", "read"},
+		{"bob", "data2", "write"},
+		{"data1_admin", "data1", "rw"},
+		{"bob", "data2", "read"},
+		{"alice", "data2", "write"},
+	})
 }
 
 func TestAdapter(t *testing.T) {
@@ -409,7 +458,13 @@ func TestCustomSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, e2.IsFiltered())
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
+		[][]string{
+			{"alice", "data1", "read"},
+			{"bob", "data2", "write"},
+			{"data2_admin", "data2", "read"},
+			{"data2_admin", "data2", "write"},
+			{"data1_admin", "data1", "rw"},
+		},
 		e2.GetPolicy(),
 	)
 

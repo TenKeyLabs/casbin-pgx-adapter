@@ -35,8 +35,9 @@ type Adapter struct {
 }
 
 type Filter struct {
-	P [][]string
-	G [][]string
+	P  [][]string
+	G  [][]string
+	G2 [][]string
 }
 
 type Option func(a *Adapter)
@@ -214,7 +215,7 @@ func (a *Adapter) SavePolicy(model model.Model) error {
 		_, err = tx.CopyFrom(
 			context.Background(),
 			a.tableIdentifier(),
-			[]string{"id", "p_type", "v0", "v1", "v2", "v3", "v4", "v5"},
+			[]string{"p_type", "v0", "v1", "v2", "v3", "v4", "v5"},
 			pgx.CopyFromRows(rows),
 		)
 		return err
@@ -328,36 +329,48 @@ func (a *Adapter) loadFilteredPolicy(model model.Model, filter *Filter, handler 
 
 	fmt.Fprintf(sb, `SELECT "p_type", "v0", "v1", "v2", "v3", "v4", "v5" FROM %s WHERE `, a.schemaTable())
 
-	buildQuery := func(policies [][]string, ptype string) {
-		if len(policies) > 0 {
-			args = append(args, ptype)
-			fmt.Fprintf(sb, `(p_type = $%d AND (`, len(args))
-			for i, p := range policies {
-				fmt.Fprint(sb, `(`)
-				for j, v := range p {
-					if v == "" {
-						continue
-					}
-					args = append(args, v)
-					fmt.Fprintf(sb, `v%d = $%d`, j, len(args))
-					if j < len(p)-1 {
-						fmt.Fprint(sb, ` AND `)
-					}
+	buildQuery := func(policies [][]string, ptype string) string {
+		if len(policies) == 0 {
+			return ""
+		}
+		queryBuilder := &strings.Builder{}
+		args = append(args, ptype)
+		fmt.Fprintf(queryBuilder, `(p_type = $%d AND (`, len(args))
+		for i, p := range policies {
+			fmt.Fprint(queryBuilder, `(`)
+			for j, v := range p {
+				if v == "" {
+					continue
 				}
-				fmt.Fprint(sb, `)`)
-				if i < len(policies)-1 {
-					fmt.Fprint(sb, ` OR `)
+				args = append(args, v)
+				fmt.Fprintf(queryBuilder, `v%d = $%d`, j, len(args))
+				if j < len(p)-1 {
+					fmt.Fprint(queryBuilder, ` AND `)
 				}
 			}
-			fmt.Fprint(sb, `))`)
+			fmt.Fprint(queryBuilder, `)`)
+			if i < len(policies)-1 {
+				fmt.Fprint(queryBuilder, ` OR `)
+			}
 		}
+		fmt.Fprint(queryBuilder, `))`)
+		return queryBuilder.String()
 	}
 
-	buildQuery(filter.P, "p")
-	if len(filter.P) > 0 && len(filter.G) > 0 {
-		fmt.Fprint(sb, ` OR `)
+	filters := []string{}
+	query := buildQuery(filter.P, "p")
+	if len(query) > 0 {
+		filters = append(filters, query)
 	}
-	buildQuery(filter.G, "g")
+	query = buildQuery(filter.G, "g")
+	if len(query) > 0 {
+		filters = append(filters, query)
+	}
+	query = buildQuery(filter.G2, "g2")
+	if len(query) > 0 {
+		filters = append(filters, query)
+	}
+	fmt.Fprintf(sb, strings.Join(filters, " OR "))
 
 	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
 	defer cancel()
@@ -468,15 +481,18 @@ func (a *Adapter) createTable() error {
 	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
 	defer cancel()
 	_, err := a.pool.Exec(ctx, fmt.Sprintf(`
+		CREATE OR REPLACE FUNCTION hashPolicy(text, text, text, text, text, text, text)
+		RETURNS text LANGUAGE sql IMMUTABLE AS $$SELECT md5(array_to_string(array[$1, $2, $3, $4, $5, $6, $7], ',')::bytea)$$;
+
 		CREATE TABLE IF NOT EXISTS %s (
-			id text PRIMARY KEY,
-			p_type text,
-			v0 text,
-			v1 text,
-			v2 text,
-			v3 text,
-			v4 text,
-			v5 text
+			id TEXT GENERATED ALWAYS AS (hashPolicy(p_type,v0,v1,v2,v3,v4,v5)) STORED PRIMARY KEY,
+			p_type TEXT,
+			v0 TEXT,
+			v1 TEXT,
+			v2 TEXT,
+			v3 TEXT,
+			v4 TEXT,
+			v5 TEXT
 		)
 	`, a.schemaTable()))
 	return err
