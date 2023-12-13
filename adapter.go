@@ -40,6 +40,14 @@ type Filter struct {
 	G2 [][]string
 }
 
+// Interface for the common DB operations supported by pgx classes
+type Conn interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+}
+
 type Option func(a *Adapter)
 
 // NewAdapter creates a new adapter with connection conn which must either be a PostgreSQL
@@ -231,9 +239,14 @@ func (a *Adapter) insertPolicyStmt() string {
 
 // AddPolicy adds a policy rule to the storage.
 func (a *Adapter) AddPolicy(sec string, ptype string, rule []string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	return a.AddPolicyWithConn(context.Background(), a.pool, ptype, rule...)
+}
+
+// AddPolicy adds a policy rule to the storage. This uses the provided connection, allowing the caller to manage transactions outside of the adapter.
+func (a *Adapter) AddPolicyWithConn(ctx context.Context, conn Conn, ptype string, rule ...string) error {
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
-	_, err := a.pool.Exec(ctx,
+	_, err := conn.Exec(ctx,
 		a.insertPolicyStmt(),
 		policyArgs(ptype, rule)...,
 	)
@@ -263,10 +276,15 @@ func (a *Adapter) AddPolicies(sec string, ptype string, rules [][]string) error 
 
 // RemovePolicy removes a policy rule from the storage.
 func (a *Adapter) RemovePolicy(sec string, ptype string, rule []string) error {
+	return a.RemovePolicyWithConn(context.Background(), a.pool, ptype, rule...)
+}
+
+// RemovePolicy removes a policy rule from the storage. This uses the provided connection, allowing the caller to manage transactions outside of the adapter.
+func (a *Adapter) RemovePolicyWithConn(ctx context.Context, conn Conn, ptype string, rule ...string) error {
 	id := policyID(ptype, rule)
-	ctx, cancel := context.WithTimeout(context.Background(), a.timeout)
+	ctx, cancel := context.WithTimeout(ctx, a.timeout)
 	defer cancel()
-	_, err := a.pool.Exec(ctx,
+	_, err := conn.Exec(ctx,
 		fmt.Sprintf("DELETE FROM %s WHERE id = $1", a.schemaTable()),
 		id,
 	)

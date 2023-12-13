@@ -31,7 +31,7 @@ func assertPolicy(t *testing.T, expected, res [][]string) {
 func testSaveLoad(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	assert.False(t, e.IsFiltered())
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
+		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 }
@@ -50,7 +50,7 @@ func testAutoSave(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 	// This is still the original policy.
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
+		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 
@@ -66,7 +66,7 @@ func testAutoSave(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 	// The policy has a new rule: {"alice", "data1", "write"}.
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"alice", "data1", "write"}},
+		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"data1_admin", "data1", "rw"}, {"alice", "data1", "write"}},
 		e.GetPolicy(),
 	)
 
@@ -76,7 +76,7 @@ func testAutoSave(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	err = e.LoadPolicy()
 	require.NoError(t, err)
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"alice", "data1", "write"}},
+		[][]string{{"alice", "data1", "read"}, {"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"data1_admin", "data1", "rw"}, {"alice", "data1", "write"}},
 		e.GetPolicy(),
 	)
 
@@ -98,6 +98,7 @@ func testAutoSave(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 			{"bob", "data2", "write"},
 			{"data2_admin", "data2", "read"},
 			{"data2_admin", "data2", "write"},
+			{"data1_admin", "data1", "rw"},
 			{"alice", "data1", "write"},
 			{"bob", "data2", "read"},
 			{"alice", "data2", "write"},
@@ -143,7 +144,7 @@ func testRemovePolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 
 	assertPolicy(t,
-		[][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
+		[][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 
@@ -151,7 +152,7 @@ func testRemovePolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 
 	assertPolicy(t,
-		[][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}},
+		[][]string{{"bob", "data2", "write"}, {"data2_admin", "data2", "read"}, {"data2_admin", "data2", "write"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 
@@ -162,7 +163,7 @@ func testRemovePolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 
 	assertPolicy(t,
-		[][]string{{"bob", "data2", "write"}},
+		[][]string{{"bob", "data2", "write"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 }
@@ -172,7 +173,7 @@ func testRemoveFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}},
+		[][]string{{"alice", "data1", "read"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 
@@ -180,7 +181,7 @@ func testRemoveFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	require.NoError(t, err)
 
 	assertPolicy(t,
-		[][]string{{"alice", "data1", "read"}},
+		[][]string{{"alice", "data1", "read"}, {"data1_admin", "data1", "rw"}},
 		e.GetPolicy(),
 	)
 }
@@ -188,21 +189,21 @@ func testRemoveFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 func testRemoveFilteredGroupingPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	e.AddGroupingPolicy("bob", "data2_admin")
 	assertPolicy(t,
-		[][]string{{"alice", "data2_admin"}, {"bob", "data2_admin"}},
+		[][]string{{"alice", "data2_admin"}, {"bob", "data1_admin"}, {"bob", "data2_admin"}},
 		e.GetGroupingPolicy(),
 	)
 
 	_, err := e.RemoveFilteredGroupingPolicy(0, "alice")
 	require.NoError(t, err)
 	assertPolicy(t,
-		[][]string{{"bob", "data2_admin"}},
+		[][]string{{"bob", "data1_admin"}, {"bob", "data2_admin"}},
 		e.GetGroupingPolicy(),
 	)
 
 	err = e.LoadPolicy()
 	require.NoError(t, err)
 	assertPolicy(t,
-		[][]string{{"bob", "data2_admin"}},
+		[][]string{{"bob", "data1_admin"}, {"bob", "data2_admin"}},
 		e.GetGroupingPolicy(),
 	)
 }
@@ -257,7 +258,7 @@ func testLoadFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	)
 }
 
-func testLoadFilteredGroupingPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
+func testLoadFilteredGroupingPolicy(t *testing.T, a *Adapter, _ *casbin.Enforcer) {
 	e, err := casbin.NewEnforcer("testdata/rbac_model.conf", a)
 	require.NoError(t, err)
 
@@ -279,7 +280,7 @@ func testLoadFilteredGroupingPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer
 	assertPolicy(t, [][]string{{"alice", "data2_admin"}}, e.GetGroupingPolicy())
 }
 
-func testLoadFilteredPolicyNilFilter(t *testing.T, a *Adapter, e *casbin.Enforcer) {
+func testLoadFilteredPolicyNilFilter(t *testing.T, a *Adapter, _ *casbin.Enforcer) {
 	e, err := casbin.NewEnforcer("testdata/rbac_model.conf", a)
 	require.NoError(t, err)
 
@@ -330,9 +331,8 @@ func testSavePolicyClearPreviousData(t *testing.T, a *Adapter, e *casbin.Enforce
 	)
 }
 
-func testUpdatePolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
-	var err error
-	e, err = casbin.NewEnforcer("testdata/rbac_model.conf", "testdata/rbac_policy.csv")
+func testUpdatePolicy(t *testing.T, a *Adapter, _ *casbin.Enforcer) {
+	e, err := casbin.NewEnforcer("testdata/rbac_model.conf", "testdata/rbac_policy.csv")
 	require.NoError(t, err)
 
 	e.SetAdapter(a)
@@ -366,9 +366,8 @@ func testUpdatePolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
 	})
 }
 
-func testUpdatePolicyWithLoadFilteredPolicy(t *testing.T, a *Adapter, e *casbin.Enforcer) {
-	var err error
-	e, err = casbin.NewEnforcer("testdata/rbac_model.conf", "testdata/rbac_policy.csv")
+func testUpdatePolicyWithLoadFilteredPolicy(t *testing.T, a *Adapter, _ *casbin.Enforcer) {
+	e, err := casbin.NewEnforcer("testdata/rbac_model.conf", "testdata/rbac_policy.csv")
 	require.NoError(t, err)
 
 	e.SetAdapter(a)
@@ -501,7 +500,7 @@ func TestRejectCollidingTableName(t *testing.T) {
 			v4 text,
 			v5 text
 		)
-	`)
+		`)
 	require.NoError(t, err)
 
 	_, err = NewAdapter(connStr, WithDatabase(dbName), WithTableName("Test_Casbin_Rules"))
@@ -510,4 +509,125 @@ func TestRejectCollidingTableName(t *testing.T) {
 	a, err := NewAdapter(connStr, WithDatabase(dbName), WithTableName("test_casbin_rules"))
 	require.NoError(t, err)
 	defer a.Close()
+}
+
+// Test with provided pgxpool - ensure that a new one is not created, and that the table is not created
+func TestRollbackAddPolicyWithConn(t *testing.T) {
+	connStr := os.Getenv("PG_CONN")
+	require.NotEmpty(t, connStr, "must run with non-empty PG_CONN")
+	dbName := "test_pgxadapter"
+	pool, err := createDatabase(dbName, connStr)
+	require.NoError(t, err)
+	defer dropDB(t, dbName)
+
+	adapter, err := NewAdapter(connStr, WithConnectionPool(pool), WithTableName("test_casbin_rules"))
+	require.NoError(t, err)
+	defer adapter.Close()
+
+	enforcer, err := casbin.NewEnforcer("testdata/rbac_model.conf", adapter)
+	require.NoError(t, err)
+
+	expectedExistingPolicies := enforcer.GetPolicy()
+
+	// Start a transaction in the connection pool, make a change to the policy, and roll back the transaction
+	ctx := context.Background()
+	dbTransaction, err := pool.Begin(ctx)
+	require.NoError(t, err)
+
+	err = adapter.AddPolicyWithConn(ctx, dbTransaction, "p", "alice", "data1", "write")
+	require.NoError(t, err)
+
+	err = dbTransaction.Rollback(context.Background())
+	require.NoError(t, err)
+
+	// Reload the policies from the storage to see the effect.
+	err = enforcer.LoadPolicy()
+	require.NoError(t, err)
+
+	// This is still the original policy.
+	assertPolicy(t,
+		expectedExistingPolicies,
+		enforcer.GetPolicy(),
+	)
+}
+
+func TestAddPolicyWithConn(t *testing.T) {
+	connStr := os.Getenv("PG_CONN")
+	require.NotEmpty(t, connStr, "must run with non-empty PG_CONN")
+	dbName := "test_pgxadapter"
+	pool, err := createDatabase(dbName, connStr)
+	require.NoError(t, err)
+	defer dropDB(t, dbName)
+
+	adapter, err := NewAdapter(connStr, WithConnectionPool(pool), WithTableName("test_casbin_rules"))
+	require.NoError(t, err)
+	defer adapter.Close()
+
+	enforcer, err := casbin.NewEnforcer("testdata/rbac_model.conf", adapter)
+	require.NoError(t, err)
+
+	expectedExistingPolicies := enforcer.GetPolicy()
+
+	// Start a transaction in the connection pool, make a change to the policy, and commit the transaction.
+	ctx := context.Background()
+	dbTransaction, err := pool.Begin(ctx)
+	require.NoError(t, err)
+
+	err = adapter.AddPolicyWithConn(ctx, dbTransaction, "p", "alice", "data1", "write")
+	require.NoError(t, err)
+
+	err = dbTransaction.Commit(context.Background())
+	require.NoError(t, err)
+
+	// Reload the policy from the storage to see the effect.
+	err = enforcer.LoadPolicy()
+	require.NoError(t, err)
+
+	// The new policy is appended.
+	assertPolicy(t,
+		append(expectedExistingPolicies, []string{"alice", "data1", "write"}),
+		enforcer.GetPolicy(),
+	)
+}
+
+func TestAddPolicyAlreadyExists(t *testing.T) {
+	connStr := os.Getenv("PG_CONN")
+	require.NotEmpty(t, connStr, "must run with non-empty PG_CONN")
+	dbName := "test_pgxadapter"
+	pool, err := createDatabase(dbName, connStr)
+	require.NoError(t, err)
+	defer dropDB(t, dbName)
+
+	adapter, err := NewAdapter(connStr, WithConnectionPool(pool), WithTableName("test_casbin_rules"))
+	require.NoError(t, err)
+	defer adapter.Close()
+
+	enforcer, err := casbin.NewEnforcer("testdata/rbac_model.conf", adapter)
+	require.NoError(t, err)
+
+	expectedExistingPolicies := enforcer.GetPolicy()
+
+	// Start a transaction in the connection pool, attempt to add the same policy twice, and commit the transaction.
+	ctx := context.Background()
+	dbTransaction, err := pool.Begin(ctx)
+	require.NoError(t, err)
+
+	err = adapter.AddPolicyWithConn(ctx, dbTransaction, "p", "alice", "data1", "write")
+	require.NoError(t, err)
+
+	err = adapter.AddPolicyWithConn(ctx, dbTransaction, "p", "alice", "data1", "write")
+	require.NoError(t, err)
+
+	err = dbTransaction.Commit(context.Background())
+	require.NoError(t, err)
+
+	// Reload the policies from the storage to see the effect.
+	err = enforcer.LoadPolicy()
+	require.NoError(t, err)
+
+	// The new policy is only appended once.
+	assertPolicy(t,
+		append(expectedExistingPolicies, []string{"alice", "data1", "write"}),
+		enforcer.GetPolicy(),
+	)
 }
